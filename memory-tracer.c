@@ -4,13 +4,6 @@
 #include <dlfcn.h>
 #include <sys/mman.h>
 
-/* static struct temp_memory {
-  size_t pos;
-  size_t allocs;
-  char buf[16384];
-} temp = { 0, 0 };
-*/
-
 #define TEMP_MALLOC_LEN 4096
 static void* temp_malloc_list[TEMP_MALLOC_LEN];
 static size_t temp_malloc_count = 0;
