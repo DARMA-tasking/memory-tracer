@@ -29,7 +29,7 @@ static void initialize_memory_tracer()  {
   fputs("Finished initializing memory tracer\n", stdout);
 }
 
-void* temp_alloc(size_t size) {
+static void* temp_alloc(size_t size) {
   fputs("temp_alloc called", stderr);
   if (temp_malloc_count >= TEMP_MALLOC_LEN - 1) {
     fputs("out of temporary allocation\n", stderr);
@@ -46,6 +46,16 @@ void* temp_alloc(size_t size) {
   return ptr;
 }
 
+static int should_trace_count = 0;
+
+void start_memory_tracer() {
+  should_trace_count++;
+}
+
+void stop_memory_tracer() {
+  should_trace_count--;
+}
+
 void* malloc(size_t size) {
   if (in_initialize) {
     // We need some allocation while we are initializing
@@ -60,7 +70,9 @@ void* malloc(size_t size) {
   }
 
   void* ptr = sys_malloc(size);
-  fprintf(stderr, "malloc(%zu) = %p\n", size, ptr);
+  if (should_trace_count > 0) {
+    fprintf(stderr, "malloc(%zu) = %p\n", size, ptr);
+  }
   return ptr;
 }
 
@@ -77,5 +89,8 @@ void free(void* ptr) {
   }
 
   sys_free(ptr);
-  fprintf(stderr, "free = %p\n", ptr);
+
+  if (should_trace_count > 0) {
+    fprintf(stderr, "free = %p\n", ptr);
+  }
 }
