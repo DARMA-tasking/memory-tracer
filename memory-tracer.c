@@ -2,20 +2,26 @@
 
 #include <stdio.h>
 #include <dlfcn.h>
+#include <sys/mman.h>
 
-static struct temp_memory {
+/* static struct temp_memory {
   size_t pos;
   size_t allocs;
   char buf[16384];
 } temp = { 0, 0 };
+*/
+
+#define TEMP_MALLOC_LEN 4096
+static void* temp_malloc_list[TEMP_MALLOC_LEN];
+static size_t temp_malloc_count = 0;
 
 static void* (*sys_malloc)(size_t) = 0;
 static void (*sys_free)(void*) = 0;
 
 static int in_initialize = 0;
 
-static void initialize_memory_tracer() {
-  in_initialize = 1;
+static void initialize_memory_tracer()  {
+  fputs("Initializing memory tracer\n", stdout);
 
   sys_malloc = dlsym(RTLD_NEXT, "malloc");
   if (!sys_malloc) {
@@ -27,30 +33,37 @@ static void initialize_memory_tracer() {
     fprintf(stderr, "Error in `dlsym`: %s\n", dlerror());
   }
 
-  in_initialize = 0;
+  fputs("Finished initializing memory tracer\n", stdout);
+}
+
+void* temp_alloc(size_t size) {
+  fputs("temp_alloc called", stderr);
+  if (temp_malloc_count >= TEMP_MALLOC_LEN - 1) {
+    fputs("out of temporary allocation\n", stderr);
+    return 0;
+  }
+
+  void* ptr = mmap(0, size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, 0, 0);
+  if (MAP_FAILED == ptr) {
+    perror("mmap failed");
+    return 0;
+  }
+
+  temp_malloc_list[temp_malloc_count++] = ptr;
+  return ptr;
 }
 
 void* malloc(size_t size) {
-  // init on demand
-  if (!sys_malloc) {
-    if (in_initialize) {
+  if (in_initialize) {
+    // We need some allocation while we are initializing
+    return temp_alloc(size);
+  }
 
-      // We need some allocation while we are initializing
-      if (temp.pos + size < sizeof(temp.buf)) {
-        void* ptr = temp.buf + temp.pos;
-        temp.pos += size;
-        temp.allocs++;
-        return ptr;
-      } else {
-        // Not enough memory
-        fprintf(
-          stderr,
-          "Ran out of temp memory: pos=%zu, allocs=%zu\n", temp.pos, temp.allocs
-        );
-      }
-    } else {
-      initialize_memory_tracer();
-    }
+  // init on demand
+  if (sys_malloc == 0) {
+    in_initialize = 1;
+    initialize_memory_tracer();
+    in_initialize = 0;
   }
 
   void* ptr = sys_malloc(size);
@@ -59,9 +72,15 @@ void* malloc(size_t size) {
 }
 
 void free(void* ptr) {
-  // Handle a temp free
-  if (ptr >= (void*)temp.buf && ptr <= (void*)(temp.buf + temp.pos)) {
-    // We are freeing memory, but won't actually change anything
+  if (in_initialize) {
+    fputs("in init free\n", stdout);
+    // leak the memory
+    return;
+  }
+
+  if (sys_free == 0 || ptr == 0) {
+    // leak during startup
+    return;
   }
 
   sys_free(ptr);
