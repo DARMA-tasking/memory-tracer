@@ -4,6 +4,8 @@
 #include <dlfcn.h>
 #include <sys/mman.h>
 
+#include "histogram_wrapper.h"
+
 #define TEMP_MALLOC_LEN 4096
 static void* temp_malloc_list[TEMP_MALLOC_LEN];
 static size_t temp_malloc_count = 0;
@@ -12,6 +14,8 @@ static void* (*sys_malloc)(size_t) = 0;
 static void (*sys_free)(void*) = 0;
 
 static int in_initialize = 0;
+
+void* histogram = 0;
 
 static void initialize_memory_tracer()  {
   fputs("Initializing memory tracer\n", stdout);
@@ -72,6 +76,11 @@ void* malloc(size_t size) {
   void* ptr = sys_malloc(size);
   if (should_trace_count > 0) {
     fprintf(stderr, "malloc(%zu) = %p\n", size, ptr);
+
+    if (!histogram) {
+      histogram = makeHistogram(8);
+    }
+    addValue(histogram, size, 1);
   }
   return ptr;
 }

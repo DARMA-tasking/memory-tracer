@@ -2,14 +2,22 @@
 #if !defined(MEMORY_TRACER_HISTOGRAM_WRAPPER)
 #define MEMORY_TRACER_HISTOGRAM_WRAPPER
 
-#include <cstdint>
+#include <stdint.h>
 
-extern "C" void* makeHistogram(int64_t num_centroids);
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-extern "C" void addValue(void* histogram, double value, int64_t count);
+void* makeHistogram(int64_t num_centroids);
 
-extern "C" void dump(void* histogram);
+void addValue(void* histogram, double value, int64_t count);
 
-extern "C" void freeHistogram(void* histogram);
+void dump(void* histogram);
+
+void freeHistogram(void* histogram);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /*MEMORY_TRACER_HISTOGRAM_WRAPPER*/
