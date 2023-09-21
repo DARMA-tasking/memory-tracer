@@ -198,9 +198,7 @@ struct HistogramApprox {
    */
   explicit HistogramApprox(CountType in_max_centroids)
     : max_centroids_(in_max_centroids)
-  {
-    cs_.resize(in_max_centroids);
-  }
+  { }
 
   /**
    * \brief Get the maximum value ever inserted in the histogram
