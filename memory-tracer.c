@@ -8,6 +8,9 @@
 #include "histogram_wrapper.h"
 
 #define TEMP_MALLOC_LEN 4096
+
+#define SHOW_ALLOC_PRINTS 0
+
 static void* temp_malloc_list[TEMP_MALLOC_LEN];
 static size_t temp_malloc_count = 0;
 
@@ -122,7 +125,9 @@ void* malloc(size_t size) {
   ratio = (double)(size) / elapsed_time;
 
   if (should_trace_count > 0) {
+#if SHOW_ALLOC_PRINTS
     fprintf(stderr, "malloc(%zu) = %p\n", size, ptr);
+#endif
     if (size_histogram) {
       in_histogram = 1;
       addValue(size_histogram, size, 1);
@@ -162,6 +167,8 @@ void free(void* ptr) {
   sys_free(ptr);
 
   if (should_trace_count > 0) {
+#if SHOW_ALLOC_PRINTS
     fprintf(stderr, "free = %p\n", ptr);
+#endif
   }
 }
