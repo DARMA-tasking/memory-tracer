@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <dlfcn.h>
 #include <sys/mman.h>
+#include <sys/time.h>
 
 #include "histogram_wrapper.h"
 
@@ -16,7 +17,12 @@ static void (*sys_free)(void*) = 0;
 static int in_initialize = 0;
 static int in_histogram = 0;
 
-void* histogram = 0;
+static struct timeval t_start, t_end;
+static double elapsed_time = 0.0, ratio = 0.0;
+
+void* size_histogram = 0;
+void* time_histogram = 0;
+void* ratio_histogram = 0;
 
 static void initialize_memory_tracer()  {
   fputs("Initializing memory tracer\n", stdout);
@@ -62,8 +68,17 @@ void stop_memory_tracer() {
 }
 
 void dump_memory_tracer() {
-  if (histogram) {
-    dump(histogram);
+  if (size_histogram) {
+    printf("size (b):\n");
+    dump(size_histogram);
+  }
+  if (time_histogram) {
+    printf("time (ms):\n");
+    dump(time_histogram);
+  }
+  if (ratio_histogram) {
+    printf("ratio (b/ms):\n");
+    dump(ratio_histogram);
   }
 }
 
@@ -82,19 +97,45 @@ void* malloc(size_t size) {
     in_initialize = 1;
     initialize_memory_tracer();
     in_initialize = 0;
-    if (histogram == 0) {
+    if (size_histogram == 0) {
       in_histogram = 1;
-      histogram = makeHistogram(8);
+      size_histogram = makeHistogram(8);
+      in_histogram = 0;
+    }
+    if (time_histogram == 0) {
+      in_histogram = 1;
+      time_histogram = makeHistogram(8);
+      in_histogram = 0;
+    }
+    if (ratio_histogram == 0) {
+      in_histogram = 1;
+      ratio_histogram = makeHistogram(8);
       in_histogram = 0;
     }
   }
 
+  gettimeofday(&t_start, NULL);
   void* ptr = sys_malloc(size);
+  gettimeofday(&t_end, NULL);
+  elapsed_time = (t_end.tv_sec  - t_start.tv_sec ) * 1000.0  //  s to ms
+               + (t_end.tv_usec - t_start.tv_usec) / 1000.0; // us to ms
+  ratio = (double)(size) / elapsed_time;
+
   if (should_trace_count > 0) {
     fprintf(stderr, "malloc(%zu) = %p\n", size, ptr);
-    if (histogram) {
+    if (size_histogram) {
       in_histogram = 1;
-      addValue(histogram, size, 1);
+      addValue(size_histogram, size, 1);
+      in_histogram = 0;
+    }
+    if (time_histogram) {
+      in_histogram = 1;
+      addValue(time_histogram, elapsed_time, 1);
+      in_histogram = 0;
+    }
+    if (ratio_histogram) {
+      in_histogram = 1;
+      addValue(ratio_histogram, ratio, 1);
       in_histogram = 0;
     }
   }
