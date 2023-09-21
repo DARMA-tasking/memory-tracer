@@ -4,6 +4,9 @@ project(memory-tracer C CXX)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 17 CACHE STRING "The C++ standard to use")
 
+add_executable(test_program test_program.cc)
+target_link_libraries(test_program memory-tracer)
+
 add_library(memory-tracer SHARED
   histogram_wrapper.cc
   histogram_wrapper.h

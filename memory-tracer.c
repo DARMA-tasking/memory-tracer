@@ -51,7 +51,7 @@ static void* temp_alloc(size_t size) {
   return ptr;
 }
 
-static int should_trace_count = 1;
+static int should_trace_count = 0;
 
 void start_memory_tracer() {
   should_trace_count++;
@@ -59,6 +59,12 @@ void start_memory_tracer() {
 
 void stop_memory_tracer() {
   should_trace_count--;
+}
+
+void dump_memory_tracer() {
+  if (histogram) {
+    dump(histogram);
+  }
 }
 
 void* malloc(size_t size) {
