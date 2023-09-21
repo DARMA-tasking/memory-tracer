@@ -11,6 +11,8 @@
 
 #define SHOW_ALLOC_PRINTS 0
 
+#define HISTOGRAM_BINS 1024
+
 static void* temp_malloc_list[TEMP_MALLOC_LEN];
 static size_t temp_malloc_count = 0;
 
@@ -102,17 +104,17 @@ void* malloc(size_t size) {
     in_initialize = 0;
     if (size_histogram == 0) {
       in_histogram = 1;
-      size_histogram = makeHistogram(8);
+      size_histogram = makeHistogram(HISTOGRAM_BINS);
       in_histogram = 0;
     }
     if (time_histogram == 0) {
       in_histogram = 1;
-      time_histogram = makeHistogram(8);
+      time_histogram = makeHistogram(HISTOGRAM_BINS);
       in_histogram = 0;
     }
     if (ratio_histogram == 0) {
       in_histogram = 1;
-      ratio_histogram = makeHistogram(8);
+      ratio_histogram = makeHistogram(HISTOGRAM_BINS);
       in_histogram = 0;
     }
   }
