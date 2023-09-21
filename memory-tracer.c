@@ -14,6 +14,7 @@ static void* (*sys_malloc)(size_t) = 0;
 static void (*sys_free)(void*) = 0;
 
 static int in_initialize = 0;
+static int in_histogram = 0;
 
 void* histogram = 0;
 
@@ -50,7 +51,7 @@ static void* temp_alloc(size_t size) {
   return ptr;
 }
 
-static int should_trace_count = 0;
+static int should_trace_count = 1;
 
 void start_memory_tracer() {
   should_trace_count++;
@@ -61,6 +62,10 @@ void stop_memory_tracer() {
 }
 
 void* malloc(size_t size) {
+  if (in_histogram) {
+    return sys_malloc(size);
+  }
+
   if (in_initialize) {
     // We need some allocation while we are initializing
     return temp_alloc(size);
@@ -71,16 +76,21 @@ void* malloc(size_t size) {
     in_initialize = 1;
     initialize_memory_tracer();
     in_initialize = 0;
+    if (histogram == 0) {
+      in_histogram = 1;
+      histogram = makeHistogram(8);
+      in_histogram = 0;
+    }
   }
 
   void* ptr = sys_malloc(size);
   if (should_trace_count > 0) {
     fprintf(stderr, "malloc(%zu) = %p\n", size, ptr);
-
-    if (!histogram) {
-      histogram = makeHistogram(8);
+    if (histogram) {
+      in_histogram = 1;
+      addValue(histogram, size, 1);
+      in_histogram = 0;
     }
-    addValue(histogram, size, 1);
   }
   return ptr;
 }
@@ -94,6 +104,11 @@ void free(void* ptr) {
 
   if (sys_free == 0 || ptr == 0) {
     // leak during startup
+    return;
+  }
+
+  if (in_histogram) {
+    sys_free(ptr);
     return;
   }
 
