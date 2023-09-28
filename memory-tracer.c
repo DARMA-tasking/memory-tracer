@@ -4,6 +4,7 @@
 #include <dlfcn.h>
 #include <sys/mman.h>
 #include <sys/time.h>
+#include <stdatomic.h>
 
 #include "histogram_wrapper.h"
 
@@ -20,7 +21,7 @@ static void* (*sys_malloc)(size_t) = 0;
 static void (*sys_free)(void*) = 0;
 
 static int in_initialize = 0;
-static int in_histogram = 0;
+static atomic_int in_histogram = 0;
 
 static struct timeval t_start, t_end;
 static double elapsed_time = 0.0, ratio = 0.0;
@@ -88,7 +89,7 @@ void dump_memory_tracer() {
 }
 
 void* malloc(size_t size) {
-  if (in_histogram) {
+  if (in_histogram > 0) {
     return sys_malloc(size);
   }
 
@@ -103,19 +104,19 @@ void* malloc(size_t size) {
     initialize_memory_tracer();
     in_initialize = 0;
     if (size_histogram == 0) {
-      in_histogram = 1;
+      in_histogram++;
       size_histogram = makeHistogram(HISTOGRAM_BINS);
-      in_histogram = 0;
+      in_histogram--;
     }
     if (time_histogram == 0) {
-      in_histogram = 1;
+      in_histogram++;
       time_histogram = makeHistogram(HISTOGRAM_BINS);
-      in_histogram = 0;
+      in_histogram--;
     }
     if (ratio_histogram == 0) {
-      in_histogram = 1;
+      in_histogram++;
       ratio_histogram = makeHistogram(HISTOGRAM_BINS);
-      in_histogram = 0;
+      in_histogram--;
     }
   }
 
@@ -131,19 +132,19 @@ void* malloc(size_t size) {
     fprintf(stderr, "malloc(%zu) = %p\n", size, ptr);
 #endif
     if (size_histogram) {
-      in_histogram = 1;
+      in_histogram++;
       addValue(size_histogram, size, 1);
-      in_histogram = 0;
+      in_histogram--;
     }
     if (time_histogram) {
-      in_histogram = 1;
+      in_histogram++;
       addValue(time_histogram, elapsed_time, 1);
-      in_histogram = 0;
+      in_histogram--;
     }
     if (ratio_histogram) {
-      in_histogram = 1;
+      in_histogram++;
       addValue(ratio_histogram, ratio, 1);
-      in_histogram = 0;
+      in_histogram--;
     }
   }
   return ptr;
@@ -161,7 +162,7 @@ void free(void* ptr) {
     return;
   }
 
-  if (in_histogram) {
+  if (in_histogram > 0) {
     sys_free(ptr);
     return;
   }
