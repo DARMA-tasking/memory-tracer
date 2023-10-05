@@ -59,23 +59,25 @@ static void* temp_alloc(size_t size) {
   return ptr;
 }
 
-static int should_trace_count = 0;
+static int should_trace_malloc = 0;
 
 void start_memory_tracer() {
-  should_trace_count++;
+  should_trace_malloc++;
+  fputs("start_memory_tracer\n", stdout);
 }
 
 void stop_memory_tracer() {
-  should_trace_count--;
+  should_trace_malloc--;
+  fputs("stop_memory_tracer\n", stdout);
 }
 
 void dump_memory_tracer() {
   if (size_histogram) {
-    printf("size (b):\n");
+    printf("malloc size (b):\n");
     dump(size_histogram);
   }
   if (time_histogram) {
-    printf("time (ms):\n");
+    printf("malloc time (ms):\n");
     dump(time_histogram);
   }
   if (ratio_histogram) {
@@ -115,7 +117,7 @@ void* malloc(size_t size) {
                       + (t_end.tv_usec - t_start.tv_usec) / 1000.0; // us to ms
   double ratio = (double)(size) / elapsed_time;
 
-  if (should_trace_count > 0) {
+  if (should_trace_malloc > 0) {
 #if SHOW_ALLOC_PRINTS
     fprintf(stderr, "malloc(%zu) = %p\n", size, ptr);
 #endif
@@ -146,7 +148,7 @@ void free(void* ptr) {
 
   sys_free(ptr);
 
-  if (should_trace_count > 0) {
+  if (should_trace_malloc > 0) {
 #if SHOW_ALLOC_PRINTS
     fprintf(stderr, "free = %p\n", ptr);
 #endif
