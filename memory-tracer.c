@@ -5,6 +5,7 @@
 #include <sys/mman.h>
 #include <sys/time.h>
 #include <stdatomic.h>
+#include <string.h>
 
 #include "histogram_wrapper.h"
 
@@ -23,8 +24,9 @@ static void (*sys_free)(void*) = 0;
 static int in_initialize = 0;
 
 void* size_histogram = 0;
-void* time_histogram = 0;
-void* ratio_histogram = 0;
+void* malloc_time_histogram = 0;
+void* touch_time_histogram = 0;
+void* touch_ratio_histogram = 0;
 
 static void initialize_memory_tracer()  {
   fputs("Initializing memory tracer\n", stdout);
@@ -60,10 +62,17 @@ static void* temp_alloc(size_t size) {
 }
 
 static int should_trace_malloc = 0;
+static int should_touch = 0;
 
 void start_memory_tracer() {
   should_trace_malloc++;
   fputs("start_memory_tracer\n", stdout);
+}
+
+void start_memory_tracer_with_touch() {
+  should_trace_malloc++;
+  should_touch = 1;
+  fputs("start_memory_tracer_with_touch\n", stdout);
 }
 
 void stop_memory_tracer() {
@@ -76,13 +85,19 @@ void dump_memory_tracer() {
     printf("malloc size (b):\n");
     dump(size_histogram);
   }
-  if (time_histogram) {
+  if (malloc_time_histogram) {
     printf("malloc time (ms):\n");
-    dump(time_histogram);
+    dump(malloc_time_histogram);
   }
-  if (ratio_histogram) {
-    printf("ratio (b/ms):\n");
-    dump(ratio_histogram);
+  if (should_touch) {
+    if (touch_time_histogram) {
+      printf("touch time (ms):\n");
+      dump(touch_time_histogram);
+    }
+    if (touch_ratio_histogram) {
+      printf("touch ratio (b/ms):\n");
+      dump(touch_ratio_histogram);
+    }
   }
 }
 
@@ -100,11 +115,14 @@ void* malloc(size_t size) {
     if (size_histogram == 0) {
       size_histogram = makeHistogram(HISTOGRAM_BINS);
     }
-    if (time_histogram == 0) {
-      time_histogram = makeHistogram(HISTOGRAM_BINS);
+    if (malloc_time_histogram == 0) {
+      malloc_time_histogram = makeHistogram(HISTOGRAM_BINS);
     }
-    if (ratio_histogram == 0) {
-      ratio_histogram = makeHistogram(HISTOGRAM_BINS);
+    if (touch_time_histogram == 0) {
+      touch_time_histogram = makeHistogram(HISTOGRAM_BINS);
+    }
+    if (touch_ratio_histogram == 0) {
+      touch_ratio_histogram = makeHistogram(HISTOGRAM_BINS);
     }
   }
 
@@ -113,9 +131,9 @@ void* malloc(size_t size) {
   void* ptr = sys_malloc(size);
   gettimeofday(&t_end, NULL);
 
-  double elapsed_time = (t_end.tv_sec  - t_start.tv_sec ) * 1000.0  //  s to ms
-                      + (t_end.tv_usec - t_start.tv_usec) / 1000.0; // us to ms
-  double ratio = (double)(size) / elapsed_time;
+  double malloc_elapsed_time =
+    (t_end.tv_sec  - t_start.tv_sec ) * 1000.0 +  //  s to ms
+    (t_end.tv_usec - t_start.tv_usec) / 1000.0;   // us to ms
 
   if (should_trace_malloc > 0) {
 #if SHOW_ALLOC_PRINTS
@@ -124,11 +142,26 @@ void* malloc(size_t size) {
     if (size_histogram) {
       addValue(size_histogram, size, 1);
     }
-    if (time_histogram) {
-      addValue(time_histogram, elapsed_time, 1);
+    if (malloc_time_histogram) {
+      addValue(malloc_time_histogram, malloc_elapsed_time, 1);
     }
-    if (ratio_histogram) {
-      addValue(ratio_histogram, ratio, 1);
+
+    if (should_touch) {
+      gettimeofday(&t_start, NULL);
+      memset(ptr, 0, size);
+      gettimeofday(&t_end, NULL);
+
+      double touch_elapsed_time =
+        (t_end.tv_sec  - t_start.tv_sec ) * 1000.0 +  //  s to ms
+        (t_end.tv_usec - t_start.tv_usec) / 1000.0;   // us to ms
+      double touch_ratio = (double)(size) / touch_elapsed_time;
+
+      if (touch_time_histogram) {
+        addValue(touch_time_histogram, touch_elapsed_time, 1);
+      }
+      if (touch_ratio_histogram) {
+        addValue(touch_ratio_histogram, touch_ratio, 1);
+      }
     }
   }
   return ptr;
